@@ -1,4 +1,3 @@
-// !  Carga y configuración del modelo
 let model;
 let modeloCargado = false;
 let historial = [];
@@ -6,27 +5,21 @@ let historial = [];
 const passageTextarea = document.getElementById("passage");
 const buscarBtn = document.getElementById("buscarBtn");
 
-// * Desactiva el botón hasta que el modelo esté listo
 buscarBtn.disabled = true;
-
-// * Carga el  modelo QnA de TensorFlow.js
 
 async function cargarModelo() {
   try {
     console.log("Cargando modelo...");
-    model = await qna.load(); // * Carga asincrónica del modelo de preguntas y respuestas
+    model = await qna.load(); 
     modeloCargado = true;
-    console.log("Modelo cargado exitosamente");
     toast("Modelo cargado. Haz una pregunta para comenzar");
     buscarBtn.disabled = false;
   } catch (error) {
-    console.error("Error al cargar el modelo:", error);
+    toast("Error al cargar el modelo, por favor reinicie la página")
   }
 }
 
 cargarModelo();
-
-// * Muestra notificación tipo toast
 
 function toast(texto) {
   const toast = document.createElement("div");
@@ -35,8 +28,6 @@ function toast(texto) {
   toast.addEventListener("click", () => toast.remove());
   document.body.appendChild(toast);
 }
-
-// * Traduce texto usando API de Google Translate
 
 async function traducir(texto, desde = "es", a = "en") {
   try {
@@ -70,12 +61,9 @@ async function traducir(texto, desde = "es", a = "en") {
   const data = await response.json();
     return data.data.translations[0].translatedText || texto;
   } catch (error) {
-    console.warn("Error en traducción, usando texto original:", error);
     return texto; 
   }
 }
-
-// ! Actualiza chat visual en la interfaz
 
 function actualizarChat() {
   const grid = document.querySelector(".grid1");
@@ -88,8 +76,6 @@ function actualizarChat() {
   });
 }
 
-// *  Leer texto con voz (SpeechSynthesis)
-
 function leerTexto(texto) {
   try {
     if ('speechSynthesis' in window) {
@@ -99,69 +85,15 @@ function leerTexto(texto) {
       window.speechSynthesis.speak(msg);
     }
   } catch (error) {
-    console.warn("Error en síntesis de voz:", error);
   }
 }
 
-
-// ! Procesa pregunta y obtiene respuesta del modelo
-
-async function preguntar() {
-  const passage = passageTextarea.value.trim();
-  const preguntaES = document.getElementById("question").value.trim();
-
-  if (!modeloCargado) {
-    toast("El modelo aún se está cargando, espera un momento...");
-    return;
-  }
-
-  try {
-    buscarBtn.disabled = true;
-
-    // * Traduce pregunta y contexto al inglés
-    const preguntaEN = await traducir(preguntaES, "es", "en");
-    historial.push(preguntaES);
-    actualizarChat();
-
-    const passageEN = await traducir(passage, "auto", "en");
-
-    // * Consulta al modelo
-    const answers = await model.findAnswers(preguntaEN, passageEN);
-    console.log("Respuestas encontradas:", answers);
-
-    if (answers && answers.length > 0 && answers[0].score > 0.1) {
-      const respuestaEN = answers[0].text;
-      const respuestaES = await traducir(respuestaEN, "en", "es");
-
-      leerTexto(respuestaES); // * Lectura en voz alta
-      historial.push(respuestaES);
-      actualizarChat();
-
-      // * Limpia input
-      document.getElementById("question").value = "";
-
-      
-
-    } else {
-      historial.push("No se encontró una respuesta.");
-      toast("No se encontró una respuesta adecuada en el texto proporcionado.");
-    }
-  } catch (error) {
-    console.error("Error al procesar pregunta:", error);
-    toast("Error al procesar la pregunta.");
-  } finally {
-    buscarBtn.disabled = false;
-  }
-}
-
-// ! Lee archivo .txt o .pdf y cargar contenido al textarea
 async function leerArchivo(event) {
   const archivo = event.target.files[0];
   if (!archivo) return;
 
   try {
     if (archivo.type === "text/plain") {
-      // * Carga archivo de texto plano
       const texto = await archivo.text();
       passageTextarea.value = texto;
       toast("Archivo de texto cargado correctamente.");
@@ -187,7 +119,6 @@ async function leerArchivo(event) {
           passageTextarea.value = textoCompleto.trim();
           toast(`PDF procesado correctamente. ${pdf.numPages} páginas leídas.`);
         } catch (error) {
-          console.error("Error al procesar PDF:", error);
           toast("Error al procesar el PDF.");
         }
       };
@@ -197,10 +128,51 @@ async function leerArchivo(event) {
       alert("Formato no soportado. Solo se permiten archivos .txt o .pdf");
     }
   } catch (error) {
-    console.error("Error al leer archivo:", error);
     toast("Error al leer el archivo.");
   }
 }
 
-// * Actualiza la interfaz de chat al inicio
+async function preguntar() {
+  const passage = passageTextarea.value.trim();
+  const preguntaES = document.getElementById("question").value.trim();
+
+  if (!modeloCargado) {
+    toast("El modelo aún se está cargando, espera un momento...");
+    return;
+  }
+
+  try {
+    buscarBtn.disabled = true;
+
+    const preguntaEN = await traducir(preguntaES, "es", "en");
+    historial.push(preguntaES);
+    actualizarChat();
+
+    const passageEN = await traducir(passage, "auto", "en");
+
+    const answers = await model.findAnswers(preguntaEN, passageEN);
+
+    if (answers && answers.length > 0 && answers[0].score > 0.1) {
+      const respuestaEN = answers[0].text;
+      const respuestaES = await traducir(respuestaEN, "en", "es");
+
+      leerTexto(respuestaES); 
+      historial.push(respuestaES);
+      actualizarChat();
+
+      document.getElementById("question").value = "";
+
+    } else {
+      historial.push("No se encontró una respuesta.");
+      toast("No se encontró una respuesta adecuada en el texto proporcionado.");
+    }
+  } catch (error) {
+    historial.push("Error al procesar la pregunta.");
+    toast("Error al procesar la pregunta.");
+  } finally {
+    buscarBtn.disabled = false;
+  }
+}
+
+
 actualizarChat();
